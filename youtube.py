@@ -6,6 +6,11 @@ import threading
 import tkinter as tk
 import pytube
 import sys
+import os
+
+
+
+
 
 root = Tk()
 root.title("Youtube Video Downloader")
@@ -81,19 +86,77 @@ def Browse():
 
 
 def Download():
+    global info
     link = link_text.get()
     video = pytube.YouTube(link)
     video_name.set(video.title)
-    v = video.streams.get_highest_resolution()
+    index = listbox.index(ACTIVE)
+    itag = info[index][4]
+    v = video.streams.get_by_itag(itag)
     video.register_on_progress_callback(on_progress)
     folder = path_text.get()
-    v.download(output_path=folder)
+    if info[index][0] == 'video':
+        v.download(output_path=folder)
+    else:
+        filename = v.default_filename.split('.')[0] + '.mp3'
+        v.download(filename=filename, output_path=folder)
+
+def Check():
+    global info 
+    link = link_text.get()
+    video = pytube.YouTube(link)
+    print('Downloading: '+video.title)
+    video.register_on_progress_callback(on_progress)
+
+    info = []
+    
+
+
+    a = video.streams.filter(type='video', progressive=True).order_by('filesize')
+    a = a.__reversed__()
+    for b in a:   
+        print(b.type, b.mime_type, b.resolution , round(b.filesize/(1024*1024), 1))
+        i = []
+        i.append(b.type)
+        i.append(b.mime_type.split('/')[1])
+        i.append(b.resolution)
+        i.append(round(b.filesize/(1024*1024), 1))
+        i.append(b.itag)
+        info.append(i)
+
+    a = video.streams.filter(type='audio').order_by('filesize')
+    a = a.__reversed__()
+    for b in a:
+   
+        print(b.type, b.mime_type, b.abr, round(b.filesize/(1024*1024), 1))
+        i = []
+        i.append(b.type)
+        i.append(b.mime_type.split('/')[1])
+        i.append(b.abr)
+        i.append(round(b.filesize/(1024*1024), 1))
+        i.append(b.itag)
+        info.append(i)
+
+    for lst in info:
+        value = lst[0] + '  ' + lst[1] + '  ' + lst[2] + '  ' + str(lst[3]) + 'MB'
+        value = f"{lst[0]} {lst[1]} {lst[2]} {lst[3]} MB"
+        listbox.insert(END, value)
+
+    download_button.grid(row=0,column=1)
+    check_button.grid_remove()
 
 def TH():
     threading.Thread(target=Download).start()
 
+def check_TH():
+    threading.Thread(target=Check).start()
+
+
 def stop():
-    quit()
+    
+    root.quit()
+    
+    
 
 head_label = Label(root, text="Youtube Video Downloader", font="Cambria 20")
 head_label.grid(row=0, column=0, columnspan=3, pady=10)
@@ -101,37 +164,52 @@ head_label.grid(row=0, column=0, columnspan=3, pady=10)
 link_label = Label(root, text="Youtube Link:", bg="salmon")
 link_label.grid(row=1, column=0, pady=5)
 
-link_text = Entry(root, width=100, textvariable=link)
-link_text.grid(row=1, column=1, columnspan=2)
+link_text = Entry(root, width=90, textvariable=link)
+link_text.grid(row=1, column=1)
 
 path_label = Label(root, text="Destination:", bg="salmon", padx=6)
 path_label.grid(row=2, column=0)
 
-path_text = Entry(root, width=87, textvariable=path)
+path_text = Entry(root,width=90, textvariable=path)
 path_text.grid(row=2, column=1)
 
 browse_button = Button(root, text="Browse", padx=5, command=Browse)
 browse_button.grid(row=2, column=2)
 
-download_button = Button(root, text="Download", padx=10, pady=10,
+listbox = Listbox(root, width=80)
+listbox.grid(row=3, columnspan=3)
+
+f = Frame(root)
+f.grid(row=4, columnspan=3)
+
+
+check_button = Button(f, text="Check", padx=10, pady=10,
+                         font="Cambria 14", command=check_TH)
+check_button.grid(row=0, column=0, padx=5)
+
+download_button = Button(f, text="Download", padx=10, pady=10,
                          font="Cambria 14", command=TH)
-download_button.grid(row=3, columnspan=3, pady=20)
+download_button.grid(row=0, column=1, padx=5)
+download_button.grid_remove()
 
 name_label = Label(root, textvariable=video_name)
-name_label.grid(row=4, columnspan=3)
+name_label.grid(row=5, columnspan=3)
 
-progress_label = Label(root, textvariable=percentage)
-progress_label.grid(row=5, column=0, pady=10)
+progress_frame = Frame(root)
+progress_frame.grid(row=6, columnspan=3)
+
+progress_label = Label(progress_frame, textvariable=percentage)
+progress_label.grid(row=0, column=0)
 
 progress_bar = ttk.Progressbar(
-    root, mode="determinate", orient="horizontal", length=350)
-progress_bar.grid(row=5, column=1)
+    progress_frame, mode="determinate", orient="horizontal", length=480)
+progress_bar.grid(row=0, column=1)
 
-downloaded_label = Label(root, textvariable=downloaded)
-downloaded_label.grid(row=5, column=2)
+downloaded_label = Label(progress_frame, textvariable=downloaded)
+downloaded_label.grid(row=0, column=2)
 
 stop_button = Button(root, text="Stop\ndownload",command=stop)
-stop_button.grid(row=6, columnspan=3, pady=10)
+stop_button.grid(row=7, columnspan=3, pady=10)
 
 
 root.mainloop()
